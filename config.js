@@ -14,4 +14,4 @@
  * -----------------------------------------------------------------------
  */
 
-const API_BASE_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzfwd7YG8QN3biXnX-Ptf1QDHbxskYyrY5VriLFapI/dev';
