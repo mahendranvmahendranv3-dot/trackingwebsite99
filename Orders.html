@@ -1,0 +1,140 @@
+<div id="page-orders" class="page-section hidden">
+  <div class="topbar">
+    <div class="flex gap-8">
+      <button class="menu-toggle" onclick="toggleMobileSidebar()">☰</button>
+      <h1>Orders</h1>
+    </div>
+    <button class="btn btn-primary" onclick="navigateTo('createorder')">+ New Order</button>
+  </div>
+
+  <div class="card">
+    <div class="filters-bar">
+      <input type="text" class="form-control" id="orderSearchInput" placeholder="Search by ID, customer, phone or product..." oninput="debouncedOrderSearch()" />
+      <select class="form-control" id="orderStatusFilter" onchange="load_orders()">
+        <option value="All">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="Processing">Processing</option>
+        <option value="Dispatched">Dispatched</option>
+        <option value="Completed">Completed</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Order ID</th><th>Customer</th><th>Product</th><th>Status</th><th>Order Date</th><th>Amount</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="ordersTableBody">
+          <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  let _orderSearchTimer = null;
+  let _ordersCache = {}; // OrderID -> full order object, used to safely build WhatsApp messages (avoids HTML-attribute quoting issues)
+
+  function debouncedOrderSearch() {
+    clearTimeout(_orderSearchTimer);
+    _orderSearchTimer = setTimeout(load_orders, 350);
+  }
+
+  async function load_orders() {
+    const body = document.getElementById('ordersTableBody');
+    body.innerHTML = '<tr><td colspan="7" class="empty-state">Loading...</td></tr>';
+    const search = document.getElementById('orderSearchInput').value.trim();
+    const status = document.getElementById('orderStatusFilter').value;
+
+    try {
+      const res = await callServer('getOrders', APP.token, { search, status });
+      if (!res || !res.success) {
+        body.innerHTML = '<tr><td colspan="7" class="empty-state">' + escapeHtml((res && res.message) || 'Failed to load orders.') + '</td></tr>';
+        return;
+      }
+      const orders = Array.isArray(res.data) ? res.data : [];
+      _ordersCache = {};
+      orders.forEach(o => { _ordersCache[o.OrderID] = o; });
+
+      if (!orders.length) {
+        body.innerHTML = '<tr><td colspan="7" class="empty-state">No orders found.</td></tr>';
+        return;
+      }
+      body.innerHTML = orders.map(o => `
+        <tr>
+          <td><strong>${escapeHtml(o.OrderID)}</strong></td>
+          <td>${escapeHtml(o.CustomerName)}</td>
+          <td>${escapeHtml(o.Product)}</td>
+          <td><span class="badge badge-${o.Status}">${escapeHtml(o.Status)}</span></td>
+          <td>${escapeHtml(o.OrderDate)}</td>
+          <td>${o.Amount ? escapeHtml(String(o.Amount)) : '-'}</td>
+          <td>
+            <div class="flex gap-8">
+              <button class="btn btn-sm btn-outline" onclick="navigateTo('editorder', {orderId: '${o.OrderID}'})">Edit</button>
+              <button class="btn btn-sm btn-success" onclick="handleSendWhatsApp('${o.OrderID}')" title="${o.WhatsAppNumber ? 'Send WhatsApp update' : 'No WhatsApp number saved for this order'}">💬 WhatsApp</button>
+              <button class="btn btn-sm btn-danger" onclick="handleDeleteOrder('${o.OrderID}')">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      body.innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load orders: ' + escapeHtml(err && err.message ? err.message : String(err)) + '</td></tr>';
+    }
+  }
+
+  async function handleDeleteOrder(orderId) {
+    if (!confirm(`Delete order ${orderId}? This cannot be undone.`)) return;
+    showLoading();
+    try {
+      const res = await callServer('deleteOrder', APP.token, orderId);
+      hideLoading();
+      if (res.success) { showToast('Order deleted.', 'success'); load_orders(); load_dashboard && load_dashboard(); }
+      else showToast(res.message, 'error');
+    } catch (err) { hideLoading(); showToast('Delete failed.', 'error'); }
+  }
+
+  /* ---------------- SEND WHATSAPP (wa.me click-to-chat, no API, no auto-send) ---------------- */
+
+  /**
+   * Turns a raw phone number into the digits-only format wa.me needs
+   * (country code + number, no +, spaces, or leading zeros).
+   * Defaults to India (91) when a 10-digit local number is given - change
+   * DEFAULT_COUNTRY_CODE below if most of your customers are elsewhere.
+   */
+  function normalizeWhatsAppNumber(raw) {
+    const DEFAULT_COUNTRY_CODE = '91';
+    let digits = String(raw || '').replace(/[^0-9]/g, ''); // strip +, spaces, dashes, etc.
+    if (!digits) return '';
+    digits = digits.replace(/^0+/, ''); // drop a leading trunk "0"
+    if (digits.length === 10) {
+      digits = DEFAULT_COUNTRY_CODE + digits; // bare local number -> add default country code
+    }
+    return digits;
+  }
+
+  function handleSendWhatsApp(orderId) {
+    const order = _ordersCache[orderId];
+    if (!order) { showToast('Order details not found. Please refresh and try again.', 'error'); return; }
+
+    const waNumber = normalizeWhatsAppNumber(order.WhatsAppNumber);
+    if (!waNumber) {
+      showToast('No WhatsApp number saved for this order. Add one via Edit Order.', 'error');
+      return;
+    }
+
+    // Static hosting: build the tracking link straight from the current
+    // site origin - no backend call needed (unlike the Apps Script version,
+    // where the real URL has to be fetched from ScriptApp.getService()).
+    const trackingLink = `${window.location.origin}/Tracking.html?orderId=${encodeURIComponent(order.OrderID)}`;
+
+    const message =
+      `Hi ${order.CustomerName},\n\n` +
+      `Your order has been updated.\n\n` +
+      `Please check the latest status here:\n${trackingLink}\n\n` +
+      `Thank you.`;
+
+    const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank'); // opens WhatsApp Web/app with the message pre-filled - client still presses Send manually
+  }
+</script>

@@ -1,0 +1,146 @@
+<div id="page-admindashboard" class="page-section hidden">
+  <div class="topbar">
+    <div class="flex gap-8">
+      <button class="menu-toggle" onclick="toggleMobileSidebar()">☰</button>
+      <h1>Client Management</h1>
+    </div>
+    <button class="btn btn-primary" onclick="openNewClientForm()">+ New Client</button>
+  </div>
+
+  <div class="card hidden" id="newClientCard" style="margin-bottom:20px;">
+    <h2 style="font-size:16px; margin-bottom:14px;">Create New Client</h2>
+    <div id="newClientAlert"></div>
+    <form onsubmit="return handleCreateClient(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Business Name</label>
+          <input type="text" class="form-control" id="ncBusinessName" required />
+        </div>
+        <div class="form-group">
+          <label>Login Username</label>
+          <input type="text" class="form-control" id="ncUsername" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Temporary Password</label>
+        <input type="password" class="form-control" id="ncPassword" minlength="6" required />
+      </div>
+      <div class="flex gap-8">
+        <button type="submit" class="btn btn-primary" id="ncSubmitBtn">Create Client</button>
+        <button type="button" class="btn btn-outline" onclick="closeNewClientForm()">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="flex-between mb-16">
+      <h2 style="font-size:16px;">All Clients</h2>
+      <input type="text" class="form-control" style="max-width:220px;" placeholder="Search clients..." oninput="filterClientsTable(this.value)" />
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Business</th><th>Code</th><th>Username</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="clientsTableBody">
+          <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  let _allClients = [];
+
+  function openNewClientForm() { document.getElementById('newClientCard').classList.remove('hidden'); }
+  function closeNewClientForm() {
+    document.getElementById('newClientCard').classList.add('hidden');
+    document.getElementById('newClientAlert').innerHTML = '';
+  }
+
+  async function load_admindashboard() {
+    const body = document.getElementById('clientsTableBody');
+    body.innerHTML = '<tr><td colspan="6" class="empty-state">Loading...</td></tr>';
+    try {
+      const res = await callServer('listClients', APP.token);
+      if (!res || !res.success) {
+        body.innerHTML = '<tr><td colspan="6" class="empty-state">' + escapeHtml((res && res.message) || 'Failed to load clients.') + '</td></tr>';
+        return;
+      }
+      _allClients = Array.isArray(res.data) ? res.data : [];
+      renderClientsTable(_allClients);
+    } catch (err) {
+      body.innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load clients: ' + escapeHtml(err && err.message ? err.message : String(err)) + '</td></tr>';
+    }
+  }
+
+  function renderClientsTable(list) {
+    const body = document.getElementById('clientsTableBody');
+    if (!list.length) {
+      body.innerHTML = '<tr><td colspan="6" class="empty-state">No clients yet. Create your first client!</td></tr>';
+      return;
+    }
+    body.innerHTML = list.map(c => `
+      <tr>
+        <td><strong>${escapeHtml(c.BusinessName)}</strong></td>
+        <td>${escapeHtml(c.ClientCode)}</td>
+        <td>${escapeHtml(c.Username)}</td>
+        <td><span class="badge badge-${c.Status === 'Active' ? 'Completed' : 'Cancelled'}">${escapeHtml(c.Status)}</span></td>
+        <td>${escapeHtml(c.CreatedDate)}</td>
+        <td>
+          <button class="btn btn-sm ${c.Status === 'Active' ? 'btn-danger' : 'btn-success'}"
+            onclick="toggleClientStatus('${c.ClientID}', '${c.Status === 'Active' ? 'Disabled' : 'Active'}')">
+            ${c.Status === 'Active' ? 'Disable' : 'Enable'}
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function filterClientsTable(query) {
+    const q = query.toLowerCase();
+    renderClientsTable(_allClients.filter(c =>
+      c.BusinessName.toLowerCase().includes(q) || c.Username.toLowerCase().includes(q) || c.ClientCode.toLowerCase().includes(q)
+    ));
+  }
+
+  async function toggleClientStatus(clientId, newStatus) {
+    if (!confirm(`Are you sure you want to set this client to "${newStatus}"?`)) return;
+    showLoading();
+    try {
+      const res = await callServer('setClientStatus', APP.token, clientId, newStatus);
+      hideLoading();
+      if (res.success) { showToast('Client updated.', 'success'); load_admindashboard(); }
+      else showToast(res.message, 'error');
+    } catch (err) { hideLoading(); showToast('Update failed.', 'error'); }
+  }
+
+  async function handleCreateClient(evt) {
+    evt.preventDefault();
+    const businessName = document.getElementById('ncBusinessName').value.trim();
+    const username = document.getElementById('ncUsername').value.trim();
+    const password = document.getElementById('ncPassword').value;
+    const btn = document.getElementById('ncSubmitBtn');
+    const alertBox = document.getElementById('newClientAlert');
+    alertBox.innerHTML = '';
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+    try {
+      const res = await callServer('createClient', APP.token, businessName, username, password);
+      if (res.success) {
+        showToast('Client created successfully.', 'success');
+        closeNewClientForm();
+        document.querySelector('#newClientCard form').reset();
+        load_admindashboard();
+      } else {
+        alertBox.innerHTML = `<div class="alert alert-error">${escapeHtml(res.message)}</div>`;
+      }
+    } catch (err) {
+      alertBox.innerHTML = `<div class="alert alert-error">Failed to create client.</div>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Create Client';
+    }
+    return false;
+  }
+</script>

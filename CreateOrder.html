@@ -1,0 +1,146 @@
+<div id="page-createorder" class="page-section hidden">
+  <div class="topbar">
+    <div class="flex gap-8">
+      <button class="menu-toggle" onclick="toggleMobileSidebar()">☰</button>
+      <h1>Create New Order</h1>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:720px;">
+    <div id="createOrderAlert"></div>
+    <form onsubmit="return handleCreateOrder(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Customer Name *</label>
+          <input type="text" class="form-control" id="coCustomerName" required />
+        </div>
+        <div class="form-group">
+          <label>Customer Phone</label>
+          <input type="text" class="form-control" id="coCustomerPhone" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>WhatsApp Number</label>
+          <input type="text" class="form-control" id="coWhatsAppNumber" placeholder="e.g. 9876543210 or +919876543210" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Product / Service *</label>
+          <input type="text" class="form-control" id="coProduct" required />
+        </div>
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="number" step="0.01" class="form-control" id="coAmount" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Order Date</label>
+          <input type="date" class="form-control" id="coOrderDate" />
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-control" id="coStatus">
+            <option value="Pending">Pending</option>
+            <option value="Processing">Processing</option>
+            <option value="Dispatched">Dispatched</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Dispatch Date</label>
+          <input type="date" class="form-control" id="coDispatchDate" />
+        </div>
+        <div class="form-group">
+          <label>Courier Name</label>
+          <input type="text" class="form-control" id="coCourierName" placeholder="e.g. Delhivery, BlueDart" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tracking Number</label>
+          <input type="text" class="form-control" id="coTrackingNumber" />
+        </div>
+        <div class="form-group">
+          <label>Courier Tracking URL</label>
+          <input type="url" class="form-control" id="coTrackingURL" placeholder="https://..." />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Expected Delivery Date</label>
+          <input type="date" class="form-control" id="coExpectedDeliveryDate" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Remarks</label>
+        <textarea class="form-control" id="coRemarks" placeholder="Any notes for this order..."></textarea>
+      </div>
+
+      <div class="flex gap-8">
+        <button type="submit" class="btn btn-primary" id="coSubmitBtn">Create Order</button>
+        <button type="button" class="btn btn-outline" onclick="navigateTo('orders')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function load_createorder() {
+    document.getElementById('createOrderAlert').innerHTML = '';
+    document.querySelector('#page-createorder form').reset();
+    document.getElementById('coOrderDate').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('coStatus').value = 'Pending';
+  }
+
+  async function handleCreateOrder(evt) {
+    evt.preventDefault();
+    const alertBox = document.getElementById('createOrderAlert');
+    alertBox.innerHTML = '';
+    const btn = document.getElementById('coSubmitBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+    const orderData = {
+      CustomerName: document.getElementById('coCustomerName').value.trim(),
+      CustomerPhone: document.getElementById('coCustomerPhone').value.trim(),
+      WhatsAppNumber: document.getElementById('coWhatsAppNumber').value.trim(),
+      Product: document.getElementById('coProduct').value.trim(),
+      Amount: document.getElementById('coAmount').value,
+      OrderDate: document.getElementById('coOrderDate').value,
+      Status: document.getElementById('coStatus').value,
+      DispatchDate: document.getElementById('coDispatchDate').value,
+      CourierName: document.getElementById('coCourierName').value.trim(),
+      TrackingNumber: document.getElementById('coTrackingNumber').value.trim(),
+      TrackingURL: document.getElementById('coTrackingURL').value.trim(),
+      ExpectedDeliveryDate: document.getElementById('coExpectedDeliveryDate').value,
+      Remarks: document.getElementById('coRemarks').value.trim()
+    };
+
+    try {
+      const res = await callServer('createOrder', APP.token, orderData);
+      if (res.success) {
+        showToast(`Order ${res.data.OrderID} created!`, 'success');
+        navigateTo('orders');
+      } else {
+        alertBox.innerHTML = `<div class="alert alert-error">${escapeHtml(res.message)}</div>`;
+      }
+    } catch (err) {
+      alertBox.innerHTML = `<div class="alert alert-error">Failed to create order.</div>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Create Order';
+    }
+    return false;
+  }
+</script>

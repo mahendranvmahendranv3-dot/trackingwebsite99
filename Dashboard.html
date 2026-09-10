@@ -1,0 +1,82 @@
+<div id="page-dashboard" class="page-section hidden">
+  <div class="topbar">
+    <div class="flex gap-8">
+      <button class="menu-toggle" id="menuToggleDash" onclick="toggleMobileSidebar()">☰</button>
+      <h1>Dashboard</h1>
+    </div>
+    <button class="btn btn-primary" onclick="navigateTo('createorder')">+ New Order</button>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card total">
+      <div class="label">Total Orders</div>
+      <div class="value" id="statTotal">0</div>
+    </div>
+    <div class="stat-card pending">
+      <div class="label">Pending</div>
+      <div class="value" id="statPending">0</div>
+    </div>
+    <div class="stat-card dispatched">
+      <div class="label">Dispatched</div>
+      <div class="value" id="statDispatched">0</div>
+    </div>
+    <div class="stat-card completed">
+      <div class="label">Completed</div>
+      <div class="value" id="statCompleted">0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="flex-between mb-16">
+      <h2 style="font-size:16px;">Recent Orders</h2>
+      <a href="javascript:void(0)" onclick="navigateTo('orders')">View all →</a>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Order ID</th><th>Customer</th><th>Product</th><th>Status</th><th>Date</th></tr>
+        </thead>
+        <tbody id="recentOrdersBody">
+          <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function load_dashboard() {
+    const body = document.getElementById('recentOrdersBody');
+    body.innerHTML = '<tr><td colspan="5" class="empty-state">Loading...</td></tr>';
+    try {
+      const res = await callServer('getDashboardStats', APP.token);
+      if (!res || !res.success) {
+        body.innerHTML = '<tr><td colspan="5" class="empty-state">' + escapeHtml((res && res.message) || 'Failed to load dashboard.') + '</td></tr>';
+        return;
+      }
+      const stats = (res.data && res.data.stats) || { total: 0, pending: 0, dispatched: 0, completed: 0 };
+      const recentOrders = Array.isArray(res.data && res.data.recentOrders) ? res.data.recentOrders : [];
+
+      document.getElementById('statTotal').textContent = stats.total;
+      document.getElementById('statPending').textContent = stats.pending;
+      document.getElementById('statDispatched').textContent = stats.dispatched;
+      document.getElementById('statCompleted').textContent = stats.completed;
+
+      if (!recentOrders.length) {
+        body.innerHTML = '<tr><td colspan="5" class="empty-state">No orders yet. Create your first order!</td></tr>';
+        return;
+      }
+      body.innerHTML = recentOrders.map(o => `
+        <tr>
+          <td><strong>${escapeHtml(o.OrderID)}</strong></td>
+          <td>${escapeHtml(o.CustomerName)}</td>
+          <td>${escapeHtml(o.Product)}</td>
+          <td><span class="badge badge-${o.Status}">${escapeHtml(o.Status)}</span></td>
+          <td>${escapeHtml(o.OrderDate)}</td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      body.innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load dashboard: ' + escapeHtml(err && err.message ? err.message : String(err)) + '</td></tr>';
+    }
+  }
+</script>

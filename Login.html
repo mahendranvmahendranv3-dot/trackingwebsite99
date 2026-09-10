@@ -1,0 +1,111 @@
+<div id="page-login" class="center-screen">
+  <div class="auth-card">
+    <div class="logo">📦 OrderTrack</div>
+    <div class="subtitle">Order Management &amp; Tracking System</div>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabClient" onclick="switchLoginTab('client')">Client Login</div>
+      <div class="auth-tab" id="tabAdmin" onclick="switchLoginTab('admin')">Admin Login</div>
+    </div>
+
+    <div id="loginAlert"></div>
+
+    <form id="clientLoginForm" onsubmit="return handleClientLogin(event)">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" class="form-control" id="clientUsername" required autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" class="form-control" id="clientPassword" required autocomplete="current-password" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="clientLoginBtn">Login</button>
+    </form>
+
+    <form id="adminLoginForm" class="hidden" onsubmit="return handleAdminLogin(event)">
+      <div class="form-group">
+        <label>Admin Username</label>
+        <input type="text" class="form-control" id="adminUsername" required autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>Admin Password</label>
+        <input type="password" class="form-control" id="adminPassword" required autocomplete="current-password" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="adminLoginBtn">Login as Admin</button>
+    </form>
+
+    <p style="text-align:center; margin-top:18px; font-size:13px; color:var(--text-muted);">
+      Tracking an order? <a href="Tracking.html">Track your order here</a>
+    </p>
+  </div>
+</div>
+
+<script>
+  function switchLoginTab(which) {
+    const isClient = which === 'client';
+    document.getElementById('tabClient').classList.toggle('active', isClient);
+    document.getElementById('tabAdmin').classList.toggle('active', !isClient);
+    document.getElementById('clientLoginForm').classList.toggle('hidden', !isClient);
+    document.getElementById('adminLoginForm').classList.toggle('hidden', isClient);
+    document.getElementById('loginAlert').innerHTML = '';
+  }
+
+  function setLoginAlert(message, type) {
+    const box = document.getElementById('loginAlert');
+    box.innerHTML = message ? `<div class="alert alert-${type}">${escapeHtml(message)}</div>` : '';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  async function handleClientLogin(evt) {
+    evt.preventDefault();
+    setLoginAlert('', '');
+    const username = document.getElementById('clientUsername').value.trim();
+    const password = document.getElementById('clientPassword').value;
+    const btn = document.getElementById('clientLoginBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+    try {
+      const res = await callServer('clientLogin', username, password);
+      if (res.success) {
+        saveSession(res.data.token, 'client', res.data.businessName, res.data.username);
+        enterApp();
+      } else {
+        setLoginAlert(res.message, 'error');
+      }
+    } catch (err) {
+      setLoginAlert('Login failed. Please try again.', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Login';
+    }
+    return false;
+  }
+
+  async function handleAdminLogin(evt) {
+    evt.preventDefault();
+    setLoginAlert('', '');
+    const username = document.getElementById('adminUsername').value.trim();
+    const password = document.getElementById('adminPassword').value;
+    const btn = document.getElementById('adminLoginBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+    try {
+      const res = await callServer('adminLogin', username, password);
+      if (res.success) {
+        saveSession(res.data.token, 'admin', 'Super Admin', res.data.username);
+        enterApp();
+      } else {
+        setLoginAlert(res.message, 'error');
+      }
+    } catch (err) {
+      setLoginAlert('Login failed. Please try again.', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Login as Admin';
+    }
+    return false;
+  }
+</script>

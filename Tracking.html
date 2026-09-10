@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Track Your Order</title>
+  <link rel="stylesheet" href="stylesheet.css">
+</head>
+<body>
+  <div class="center-screen">
+    <div class="auth-card" style="max-width:460px;">
+      <div class="logo">📦 Track Your Order</div>
+      <div class="subtitle">Enter your Order ID to see the latest status</div>
+
+      <div id="trackAlert"></div>
+
+      <form onsubmit="return handleTrackOrder(event)">
+        <div class="form-group">
+          <label>Order ID</label>
+          <input type="text" class="form-control" id="trackOrderId" placeholder="e.g. SUNTRA-20250601-0007" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="trackSubmitBtn">Track Order</button>
+      </form>
+
+      <div id="trackResult" class="track-result hidden">
+        <div class="flex-between mb-16">
+          <h2 style="font-size:16px;" id="trackBusinessName"></h2>
+          <span class="badge" id="trackStatusBadge"></span>
+        </div>
+
+        <ul class="track-step-list">
+          <li><span class="k">Order ID</span><span class="v" id="trackOrderIdOut"></span></li>
+          <li><span class="k">Customer Name</span><span class="v" id="trackCustomerName"></span></li>
+          <li><span class="k">Product / Service</span><span class="v" id="trackProduct"></span></li>
+          <li><span class="k">Order Date</span><span class="v" id="trackOrderDate"></span></li>
+          <li><span class="k">Order Status</span><span class="v" id="trackStatusText"></span></li>
+        </ul>
+
+        <!-- Courier / dispatch info - automatically shown once the order is Dispatched -->
+        <div id="trackCourierSection" class="hidden">
+          <div style="border-top:1px solid var(--border); margin:14px 0;"></div>
+          <ul class="track-step-list">
+            <li><span class="k">Dispatch Date</span><span class="v" id="trackDispatchDate"></span></li>
+            <li><span class="k">Courier Name</span><span class="v" id="trackCourier"></span></li>
+            <li><span class="k">Tracking Number</span><span class="v" id="trackNumber"></span></li>
+            <li><span class="k">Expected Delivery</span><span class="v" id="trackExpectedDelivery"></span></li>
+          </ul>
+
+          <a id="trackCourierLink" class="btn btn-primary btn-block mt-16 hidden" target="_blank" rel="noopener">
+            Track Shipment →
+          </a>
+          <p id="trackNoLinkMsg" class="alert alert-error mt-16 hidden" style="text-align:center;">
+            Tracking information will be updated soon.
+          </p>
+        </div>
+
+        <div style="border-top:1px solid var(--border); margin:14px 0;"></div>
+        <ul class="track-step-list">
+          <li><span class="k">Remarks</span><span class="v" id="trackRemarks"></span></li>
+          <li><span class="k">Last Updated</span><span class="v" id="trackLastUpdated"></span></li>
+        </ul>
+      </div>
+
+      <p style="text-align:center; margin-top:18px; font-size:13px; color:var(--text-muted);">
+        Are you a business? <a href="index.html">Login here</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+
+    function setTrackAlert(message, type) {
+      const box = document.getElementById('trackAlert');
+      box.innerHTML = message ? `<div class="alert alert-${type}">${escapeHtml(message)}</div>` : '';
+    }
+
+    async function handleTrackOrder(evt) {
+      if (evt && evt.preventDefault) evt.preventDefault();
+      const orderId = document.getElementById('trackOrderId').value.trim();
+      await trackOrder(orderId);
+      return false;
+    }
+
+    async function trackOrder(orderId) {
+      const btn = document.getElementById('trackSubmitBtn');
+      setTrackAlert('', '');
+      document.getElementById('trackResult').classList.add('hidden');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+      try {
+        if (!API_BASE_URL || API_BASE_URL.indexOf('PASTE_YOUR') !== -1) {
+          throw new Error('API_BASE_URL is not configured. Edit config.js and paste your Apps Script Web App URL.');
+        }
+
+        // Content-Type: text/plain keeps this a CORS "simple request" so
+        // Apps Script (which can't handle a preflight OPTIONS call) works.
+        const response = await fetch(API_BASE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'trackOrderPublic', params: [orderId] })
+        });
+        if (!response.ok) throw new Error('Network error (' + response.status + ')');
+        const res = await response.json();
+
+        btn.disabled = false; btn.textContent = 'Track Order';
+        if (!res.success) { setTrackAlert(res.message, 'error'); return; }
+        renderTrackResult(res.data);
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Track Order';
+        setTrackAlert(err.message || 'Something went wrong. Please try again.', 'error');
+      }
+    }
+
+    // Auto-fill and auto-track when arriving via a link that already
+    // includes the Order ID, e.g. Tracking.html?orderId=SUNRIS-20260908-0001
+    // (used by the client dashboard's "Send WhatsApp" button).
+    document.addEventListener('DOMContentLoaded', function () {
+      const params = new URLSearchParams(window.location.search);
+      const prefilledOrderId = params.get('orderId');
+      if (prefilledOrderId) {
+        document.getElementById('trackOrderId').value = prefilledOrderId;
+        trackOrder(prefilledOrderId);
+      }
+    });
+
+    // Basic client-side check that TrackingURL looks like a real, openable link
+    function isValidTrackingUrl(url) {
+      if (!url) return false;
+      try {
+        const u = new URL(url);
+        return u.protocol === 'http:' || u.protocol === 'https:';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function renderTrackResult(o) {
+      document.getElementById('trackBusinessName').textContent = o.BusinessName || '';
+      const badge = document.getElementById('trackStatusBadge');
+      badge.textContent = o.Status;
+      badge.className = 'badge badge-' + o.Status;
+
+      document.getElementById('trackOrderIdOut').textContent = o.OrderID;
+      document.getElementById('trackCustomerName').textContent = o.CustomerName || '-';
+      document.getElementById('trackProduct').textContent = o.Product || '-';
+      document.getElementById('trackOrderDate').textContent = o.OrderDate || '-';
+      document.getElementById('trackStatusText').textContent = o.Status || '-';
+      document.getElementById('trackRemarks').textContent = o.Remarks || '-';
+      document.getElementById('trackLastUpdated').textContent = o.LastUpdated || '-';
+
+      // Courier / dispatch details: automatically shown once the order is
+      // Dispatched (or later, e.g. Completed), or as soon as any courier
+      // info has been entered - so a client can add tracking details early.
+      const hasCourierData = !!(o.DispatchDate || o.CourierName || o.TrackingNumber || o.TrackingURL);
+      const isDispatchedOrLater = o.Status === 'Dispatched' || o.Status === 'Completed';
+      const courierSection = document.getElementById('trackCourierSection');
+
+      if (isDispatchedOrLater || hasCourierData) {
+        courierSection.classList.remove('hidden');
+        document.getElementById('trackDispatchDate').textContent = o.DispatchDate || 'Not yet dispatched';
+        document.getElementById('trackCourier').textContent = o.CourierName || '-';
+        document.getElementById('trackNumber').textContent = o.TrackingNumber || '-';
+        document.getElementById('trackExpectedDelivery').textContent = o.ExpectedDeliveryDate || '-';
+
+        const link = document.getElementById('trackCourierLink');
+        const noLinkMsg = document.getElementById('trackNoLinkMsg');
+        if (isValidTrackingUrl(o.TrackingURL)) {
+          link.href = o.TrackingURL;
+          link.classList.remove('hidden');
+          noLinkMsg.classList.add('hidden');
+        } else {
+          link.classList.add('hidden');
+          noLinkMsg.classList.remove('hidden');
+        }
+      } else {
+        courierSection.classList.add('hidden');
+      }
+
+      document.getElementById('trackResult').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>

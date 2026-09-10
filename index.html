@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order Management System</title>
+  <link rel="stylesheet" href="stylesheet.css">
+</head>
+<body>
+  <div id="globalLoading" class="loading-overlay hidden"><span class="spinner"></span></div>
+
+  <div id="appRoot">
+
+    <!-- ===================== LOGIN SCREEN ===================== -->
+    <!-- Login.html is fetched at runtime and injected here (see javascript.js) -->
+    <div id="slot-login"></div>
+
+    <!-- ===================== AUTHENTICATED APP SHELL ===================== -->
+    <div id="shellApp" class="app-shell hidden">
+
+      <aside class="sidebar">
+        <div class="brand">
+          📦 OrderTrack
+          <small id="sidebarBusinessName">Account</small>
+        </div>
+
+        <div data-role="client">
+          <div class="nav-item" data-page="dashboard"><span class="nav-icon">🏠</span> Dashboard</div>
+          <div class="nav-item" data-page="orders"><span class="nav-icon">📋</span> Orders</div>
+          <div class="nav-item" data-page="createorder"><span class="nav-icon">➕</span> Create Order</div>
+        </div>
+
+        <div data-role="admin">
+          <div class="nav-item" data-page="admindashboard"><span class="nav-icon">🏢</span> Clients</div>
+        </div>
+
+        <div class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Settings</div>
+        <div class="nav-item" data-page="profile"><span class="nav-icon">👤</span> Profile</div>
+
+        <div style="margin-top:auto; padding:16px 20px;">
+          <button class="btn btn-outline btn-block" id="logoutBtn">Log Out</button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <!-- Each screen is fetched at runtime from its own file and injected here -->
+        <div id="slot-dashboard"></div>
+        <div id="slot-admindashboard"></div>
+        <div id="slot-orders"></div>
+        <div id="slot-createorder"></div>
+        <div id="slot-editorder"></div>
+        <div id="slot-settings"></div>
+        <div id="slot-profile"></div>
+      </main>
+
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="javascript.js"></script>
+</body>
+</html>

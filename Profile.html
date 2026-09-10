@@ -1,0 +1,34 @@
+<div id="page-profile" class="page-section hidden">
+  <div class="topbar">
+    <div class="flex gap-8">
+      <button class="menu-toggle" onclick="toggleMobileSidebar()">☰</button>
+      <h1>Profile</h1>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:480px;">
+    <div class="flex gap-8" style="margin-bottom:20px;">
+      <div class="profile-avatar" id="profileAvatarInitial">?</div>
+      <div>
+        <div style="font-weight:700; font-size:16px;" id="profileBusinessName">-</div>
+        <div style="color:var(--text-muted); font-size:13px;" id="profileUsername">-</div>
+      </div>
+    </div>
+
+    <div class="track-step-list" style="border-top:1px solid var(--border); padding-top:10px;">
+      <li><span class="k">Account Type</span><span class="v" id="profileType">Client</span></li>
+    </div>
+
+    <button class="btn btn-danger mt-16" onclick="logoutUser()">Log Out</button>
+  </div>
+</div>
+
+<script>
+  function load_profile() {
+    const name = APP.businessName || APP.username || 'A';
+    document.getElementById('profileAvatarInitial').textContent = name.charAt(0).toUpperCase();
+    document.getElementById('profileBusinessName').textContent = APP.businessName || APP.username;
+    document.getElementById('profileUsername').textContent = '@' + APP.username;
+    document.getElementById('profileType').textContent = APP.sessionType === 'admin' ? 'Super Admin' : 'Client';
+  }
+</script>

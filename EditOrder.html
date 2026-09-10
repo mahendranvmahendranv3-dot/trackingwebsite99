@@ -1,0 +1,185 @@
+<div id="page-editorder" class="page-section hidden">
+  <div class="topbar">
+    <div class="flex gap-8">
+      <button class="menu-toggle" onclick="toggleMobileSidebar()">☰</button>
+      <h1>Edit Order <span id="eoOrderIdLabel" style="color:var(--text-muted); font-weight:500;"></span></h1>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:720px;">
+    <div id="editOrderAlert"></div>
+    <div id="editOrderLoading" class="empty-state">Loading order...</div>
+
+    <form id="editOrderForm" class="hidden" onsubmit="return handleUpdateOrder(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Customer Name *</label>
+          <input type="text" class="form-control" id="eoCustomerName" required />
+        </div>
+        <div class="form-group">
+          <label>Customer Phone</label>
+          <input type="text" class="form-control" id="eoCustomerPhone" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>WhatsApp Number</label>
+          <input type="text" class="form-control" id="eoWhatsAppNumber" placeholder="e.g. 9876543210 or +919876543210" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Product / Service *</label>
+          <input type="text" class="form-control" id="eoProduct" required />
+        </div>
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="number" step="0.01" class="form-control" id="eoAmount" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Order Date</label>
+          <input type="date" class="form-control" id="eoOrderDate" />
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-control" id="eoStatus">
+            <option value="Pending">Pending</option>
+            <option value="Processing">Processing</option>
+            <option value="Dispatched">Dispatched</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Dispatch Date</label>
+          <input type="date" class="form-control" id="eoDispatchDate" />
+        </div>
+        <div class="form-group">
+          <label>Courier Name</label>
+          <input type="text" class="form-control" id="eoCourierName" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tracking Number</label>
+          <input type="text" class="form-control" id="eoTrackingNumber" />
+        </div>
+        <div class="form-group">
+          <label>Courier Tracking URL</label>
+          <input type="url" class="form-control" id="eoTrackingURL" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Expected Delivery Date</label>
+          <input type="date" class="form-control" id="eoExpectedDeliveryDate" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Remarks</label>
+        <textarea class="form-control" id="eoRemarks"></textarea>
+      </div>
+
+      <div class="flex gap-8">
+        <button type="submit" class="btn btn-primary" id="eoSubmitBtn">Save Changes</button>
+        <button type="button" class="btn btn-outline" onclick="navigateTo('orders')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  let _currentEditOrderId = null;
+
+  async function load_editorder(params) {
+    const orderId = params && params.orderId;
+    _currentEditOrderId = orderId;
+    document.getElementById('eoOrderIdLabel').textContent = orderId ? '- ' + orderId : '';
+    document.getElementById('editOrderAlert').innerHTML = '';
+    document.getElementById('editOrderForm').classList.add('hidden');
+    document.getElementById('editOrderLoading').classList.remove('hidden');
+    document.getElementById('editOrderLoading').textContent = 'Loading order...';
+
+    if (!orderId) {
+      document.getElementById('editOrderLoading').textContent = 'No order selected.';
+      return;
+    }
+
+    try {
+      const res = await callServer('getOrderById', APP.token, orderId);
+      if (!res.success) {
+        document.getElementById('editOrderLoading').textContent = res.message;
+        return;
+      }
+      const o = res.data;
+      document.getElementById('eoCustomerName').value = o.CustomerName || '';
+      document.getElementById('eoCustomerPhone').value = o.CustomerPhone || '';
+      document.getElementById('eoWhatsAppNumber').value = o.WhatsAppNumber || '';
+      document.getElementById('eoProduct').value = o.Product || '';
+      document.getElementById('eoAmount').value = o.Amount || '';
+      document.getElementById('eoOrderDate').value = o.OrderDate || '';
+      document.getElementById('eoStatus').value = o.Status || 'Pending';
+      document.getElementById('eoDispatchDate').value = o.DispatchDate || '';
+      document.getElementById('eoCourierName').value = o.CourierName || '';
+      document.getElementById('eoTrackingNumber').value = o.TrackingNumber || '';
+      document.getElementById('eoTrackingURL').value = o.TrackingURL || '';
+      document.getElementById('eoExpectedDeliveryDate').value = o.ExpectedDeliveryDate || '';
+      document.getElementById('eoRemarks').value = o.Remarks || '';
+
+      document.getElementById('editOrderLoading').classList.add('hidden');
+      document.getElementById('editOrderForm').classList.remove('hidden');
+    } catch (err) {
+      document.getElementById('editOrderLoading').textContent = 'Failed to load order.';
+    }
+  }
+
+  async function handleUpdateOrder(evt) {
+    evt.preventDefault();
+    const alertBox = document.getElementById('editOrderAlert');
+    alertBox.innerHTML = '';
+    const btn = document.getElementById('eoSubmitBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+    const orderData = {
+      CustomerName: document.getElementById('eoCustomerName').value.trim(),
+      CustomerPhone: document.getElementById('eoCustomerPhone').value.trim(),
+      WhatsAppNumber: document.getElementById('eoWhatsAppNumber').value.trim(),
+      Product: document.getElementById('eoProduct').value.trim(),
+      Amount: document.getElementById('eoAmount').value,
+      OrderDate: document.getElementById('eoOrderDate').value,
+      Status: document.getElementById('eoStatus').value,
+      DispatchDate: document.getElementById('eoDispatchDate').value,
+      CourierName: document.getElementById('eoCourierName').value.trim(),
+      TrackingNumber: document.getElementById('eoTrackingNumber').value.trim(),
+      TrackingURL: document.getElementById('eoTrackingURL').value.trim(),
+      ExpectedDeliveryDate: document.getElementById('eoExpectedDeliveryDate').value,
+      Remarks: document.getElementById('eoRemarks').value.trim()
+    };
+
+    try {
+      const res = await callServer('updateOrder', APP.token, _currentEditOrderId, orderData);
+      if (res.success) {
+        showToast('Order updated!', 'success');
+        navigateTo('orders');
+      } else {
+        alertBox.innerHTML = `<div class="alert alert-error">${escapeHtml(res.message)}</div>`;
+      }
+    } catch (err) {
+      alertBox.innerHTML = `<div class="alert alert-error">Failed to update order.</div>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save Changes';
+    }
+    return false;
+  }
+</script>

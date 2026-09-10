@@ -1,0 +1,69 @@
+<div id="page-settings" class="page-section hidden">
+  <div class="topbar">
+    <div class="flex gap-8">
+      <button class="menu-toggle" onclick="toggleMobileSidebar()">☰</button>
+      <h1>Settings</h1>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:480px;">
+    <h2 style="font-size:16px; margin-bottom:16px;">Change Password</h2>
+    <div id="settingsAlert"></div>
+    <form onsubmit="return handleChangePassword(event)">
+      <div class="form-group">
+        <label>Current Password</label>
+        <input type="password" class="form-control" id="stCurrentPassword" required />
+      </div>
+      <div class="form-group">
+        <label>New Password</label>
+        <input type="password" class="form-control" id="stNewPassword" minlength="6" required />
+      </div>
+      <div class="form-group">
+        <label>Confirm New Password</label>
+        <input type="password" class="form-control" id="stConfirmPassword" minlength="6" required />
+      </div>
+      <button type="submit" class="btn btn-primary" id="stSubmitBtn">Update Password</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  function load_settings() {
+    document.getElementById('settingsAlert').innerHTML = '';
+    const form = document.querySelector('#page-settings form');
+    if (form) form.reset();
+  }
+
+  async function handleChangePassword(evt) {
+    evt.preventDefault();
+    const alertBox = document.getElementById('settingsAlert');
+    alertBox.innerHTML = '';
+
+    const current = document.getElementById('stCurrentPassword').value;
+    const next = document.getElementById('stNewPassword').value;
+    const confirm = document.getElementById('stConfirmPassword').value;
+
+    if (next !== confirm) {
+      alertBox.innerHTML = '<div class="alert alert-error">New passwords do not match.</div>';
+      return false;
+    }
+
+    const btn = document.getElementById('stSubmitBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+    try {
+      const res = await callServer('changePassword', APP.token, current, next);
+      if (res.success) {
+        alertBox.innerHTML = '<div class="alert alert-success">Password updated successfully.</div>';
+        document.querySelector('#page-settings form').reset();
+      } else {
+        alertBox.innerHTML = `<div class="alert alert-error">${escapeHtml(res.message)}</div>`;
+      }
+    } catch (err) {
+      alertBox.innerHTML = '<div class="alert alert-error">Failed to update password.</div>';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Update Password';
+    }
+    return false;
+  }
+</script>
